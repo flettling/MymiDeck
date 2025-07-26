@@ -159,6 +159,7 @@ python manage.py migrate
 - PostgreSQL
 - psycopg2
 - Docker & Docker Compose
+- Django Q (für Background Tasks)
 
 ### Projektstruktur:
 ```
@@ -175,11 +176,21 @@ MymiDeck/
 └── requirements.txt        # Python Dependencies
 ```
 
+### Background Tasks:
+
+Das Projekt nutzt **Django Q** für asynchrone Hintergrundprozesse:
+
+- **Web Crawling**: Playwright-basiertes Crawling der MyMi-Website
+- **Datenverarbeitung**: Bildverarbeitung und Content-Extraktion
+- **Export-Generierung**: Anki CSV-Export für große Datenmengen
+- **Wartungsaufgaben**: Datenbank-Optimierung und Cleanup
+
 ### Nächste Schritte:
-1. Playwright-Integration für Web Crawling
-2. Anki-Export-Module implementieren
-3. Bildverarbeitungs-Pipeline für Mikroskopie-Daten
-4. Content-Extraction aus interaktiven Lernmodulen
+1. Django Q Setup und Konfiguration
+2. Playwright-Integration für Web Crawling
+3. Anki-Export-Module implementieren
+4. Bildverarbeitungs-Pipeline für Mikroskopie-Daten
+5. Content-Extraction aus interaktiven Lernmodulen
 
 ---
 
