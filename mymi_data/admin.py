@@ -1,5 +1,7 @@
 from django.contrib import admin
 from django.utils.html import format_html
+from django.conf import settings
+import os
 from .models import (
     OrganSystem, Species, Staining, Subject, Institution, 
     TileServer, Image, Exploration, Diagnosis, StructureSearch, Locale
@@ -87,32 +89,114 @@ class TileServerAdmin(admin.ModelAdmin):
 
 @admin.register(Image)
 class ImageAdmin(admin.ModelAdmin):
-    list_display = ('id', 'title', 'species', 'staining', 'state', 'size')
+    list_display = ('id', 'title', 'species', 'staining', 'state', 'size', 'thumbnail_preview')
     list_filter = ('state', 'imaging_diagnostic', 'species', 'staining')
     search_fields = ('title', 'file_path')
     readonly_fields = ('id', 'title', 'checksum', 'size', 'file_path', 'thumbnail_small', 
-                      'thumbnail_medium', 'thumbnail_large', 'thumbnail_small_link',
-                      'thumbnail_medium_link', 'thumbnail_large_link', 'state', 'imaging_diagnostic', 
+                      'thumbnail_medium', 'thumbnail_large', 'thumbnail_small_display',
+                      'thumbnail_medium_display', 'thumbnail_large_display', 'state', 'imaging_diagnostic', 
                       'staining', 'species', 'tile_server', 'tags', 'deleted_at')
     filter_horizontal = ('organ_systems',)
     
-    def thumbnail_small_link(self, obj):
-        if obj.thumbnail_small_url:
-            return format_html('<a href="{}" target="_blank">{}</a>', obj.thumbnail_small_url, obj.thumbnail_small_url)
-        return "No thumbnail"
-    thumbnail_small_link.short_description = "Thumbnail Small URL"
+    def get_local_thumbnail_path(self, filename):
+        """Check if thumbnail exists locally in media/thumbnails/"""
+        if not filename:
+            return None
+        local_path = os.path.join(settings.MEDIA_ROOT, 'thumbnails', filename)
+        if os.path.exists(local_path):
+            return f"{settings.MEDIA_URL}thumbnails/{filename}"
+        return None
     
-    def thumbnail_medium_link(self, obj):
-        if obj.thumbnail_medium_url:
-            return format_html('<a href="{}" target="_blank">{}</a>', obj.thumbnail_medium_url, obj.thumbnail_medium_url)
+    def thumbnail_preview(self, obj):
+        """Small thumbnail for list view"""
+        local_url = None
+        if obj.thumbnail_small:
+            local_url = self.get_local_thumbnail_path(obj.thumbnail_small)
+        
+        if local_url:
+            return format_html('<img src="{}" style="max-height: 50px; max-width: 80px;" />', local_url)
+        elif obj.thumbnail_small_url:
+            return format_html('<img src="{}" style="max-height: 50px; max-width: 80px;" />', obj.thumbnail_small_url)
         return "No thumbnail"
-    thumbnail_medium_link.short_description = "Thumbnail Medium URL"
+    thumbnail_preview.short_description = "Preview"
     
-    def thumbnail_large_link(self, obj):
-        if obj.thumbnail_large_url:
-            return format_html('<a href="{}" target="_blank">{}</a>', obj.thumbnail_large_url, obj.thumbnail_large_url)
-        return "No thumbnail"
-    thumbnail_large_link.short_description = "Thumbnail Large URL"
+    def thumbnail_small_display(self, obj):
+        """Small thumbnail for detail view"""
+        local_url = None
+        if obj.thumbnail_small:
+            local_url = self.get_local_thumbnail_path(obj.thumbnail_small)
+        
+        # Determine which image to show (prefer local)
+        display_url = local_url if local_url else obj.thumbnail_small_url
+        
+        if display_url:
+            html = f'<div><img src="{display_url}" style="max-height: 150px; max-width: 200px;" /><br/>'
+            
+            # Add local link if exists
+            if local_url:
+                html += f'<a href="{local_url}" target="_blank">Local: {obj.thumbnail_small}</a><br/>'
+            
+            # Add remote link if exists
+            if obj.thumbnail_small_url:
+                html += f'<a href="{obj.thumbnail_small_url}" target="_blank">Remote: {obj.thumbnail_small_url}</a>'
+            
+            html += '</div>'
+            return format_html(html)
+        
+        return "No small thumbnail"
+    thumbnail_small_display.short_description = "Small Thumbnail"
+    
+    def thumbnail_medium_display(self, obj):
+        """Medium thumbnail for detail view"""
+        local_url = None
+        if obj.thumbnail_medium:
+            local_url = self.get_local_thumbnail_path(obj.thumbnail_medium)
+        
+        # Determine which image to show (prefer local)
+        display_url = local_url if local_url else obj.thumbnail_medium_url
+        
+        if display_url:
+            html = f'<div><img src="{display_url}" style="max-height: 200px; max-width: 300px;" /><br/>'
+            
+            # Add local link if exists
+            if local_url:
+                html += f'<a href="{local_url}" target="_blank">Local: {obj.thumbnail_medium}</a><br/>'
+            
+            # Add remote link if exists
+            if obj.thumbnail_medium_url:
+                html += f'<a href="{obj.thumbnail_medium_url}" target="_blank">Remote: {obj.thumbnail_medium_url}</a>'
+            
+            html += '</div>'
+            return format_html(html)
+        
+        return "No medium thumbnail"
+    thumbnail_medium_display.short_description = "Medium Thumbnail"
+    
+    def thumbnail_large_display(self, obj):
+        """Large thumbnail for detail view"""
+        local_url = None
+        if obj.thumbnail_large:
+            local_url = self.get_local_thumbnail_path(obj.thumbnail_large)
+        
+        # Determine which image to show (prefer local)
+        display_url = local_url if local_url else obj.thumbnail_large_url
+        
+        if display_url:
+            html = f'<div><img src="{display_url}" style="max-height: 300px; max-width: 400px;" /><br/>'
+            
+            # Add local link if exists
+            if local_url:
+                html += f'<a href="{local_url}" target="_blank">Local: {obj.thumbnail_large}</a><br/>'
+            
+            # Add remote link if exists
+            if obj.thumbnail_large_url:
+                html += f'<a href="{obj.thumbnail_large_url}" target="_blank">Remote: {obj.thumbnail_large_url}</a>'
+            
+            html += '</div>'
+            return format_html(html)
+        
+        return "No large thumbnail"
+    thumbnail_large_display.short_description = "Large Thumbnail"
     
     def get_readonly_fields(self, request, obj=None):
         # Make organ_systems readonly too by overriding the field

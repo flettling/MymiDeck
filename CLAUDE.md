@@ -143,10 +143,11 @@ python manage.py migrate
 3. **JSON-Import-System** mit 1.561 Datensätzen
 4. **Read-Only Admin Interface** für Datenverwaltung
 5. **Modulare Model-Architektur** (jedes Model in eigener Datei)
+6. **Thumbnail-Crawler** mit JWT-Authentifizierung
+7. **Admin Thumbnail-Anzeige** (local + remote)
 
 ### 🚧 Geplant:
-1. **Playwright Web Crawler** für https://mymi.uni-ulm.de/
-2. **Anki CSV Export-Funktionalität**
+1. **Anki CSV Export-Funktionalität**
 3. **Bildverarbeitung** für Mikroskopie-Tiles
 4. **Content-Extraktion** aus virtuellen Mikroskopen
 
@@ -211,8 +212,62 @@ python manage.py migrate
 # Daten importieren
 python manage.py import_mymi_data
 
+### 📸 Thumbnail-Crawler
+
+**Zweck:** Lädt Thumbnails von der MyMi-Plattform herunter und speichert sie lokal für bessere Performance im Admin Interface.
+
+**Authentifizierung:** Nutzt JWT-Token aus Browser-Session
+
+#### Crawler ausführen:
+```bash
+# Im Docker Container - interaktiver Modus:
+docker-compose exec web python manage.py crawl_thumbnails_simple --limit 10
+
+# Crawler zeigt Anleitung und fragt nach JWT:
+# 🔐 MyMi JWT Token Required
+# 1. Go to https://mymi.uni-ulm.de/ and login
+# 2. Press F12 → Application → Cookies → mymi_jwt
+# 3. Copy the JWT token value and paste below:
+# JWT Token: [hier JWT-Token einfügen]
+
+# Parameter:
+# --output-dir: Zielordner für Thumbnails (default: media/thumbnails)
+# --limit: Anzahl Images zu verarbeiten (optional, für Tests)
+# --cookies: JWT-Token direkt angeben (optional)
+```
+
+#### Alternativer direkter Modus:
+```bash
+# Mit direktem JWT-Token (überspringt Eingabeaufforderung):
+docker-compose exec web python manage.py crawl_thumbnails_simple \
+  --cookies "mymi_jwt=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
+  --limit 10
+```
+
+#### Features:
+- **Interaktiver Modus**: Benutzerfreundliche JWT-Token-Eingabe
+- **Copy-Paste freundlich**: Einfaches Einfügen des JWT-Tokens
+- **Smart URL-Detection**: Nutzt calculated fields aus Image-Model
+- **Original-Dateinamen**: Speichert als `53lN9wqU33OC20fO.jpg`
+- **Multiple Größen**: Versucht Large → Medium → Small Thumbnails
+- **Rate-Limiting**: Schont Server mit 0.5s Verzögerung
+- **Robuste Fehlerbehandlung**: Überspringt fehlerhafte URLs
+
+#### Admin Interface:
+Nach dem Crawling zeigt das Admin Interface:
+- **Liste**: Thumbnail-Previews (50px) in der Image-Übersicht
+- **Detail**: Alle 3 Größen (Small/Medium/Large) mit separaten Anzeigen
+- **Dual-Links**: Sowohl Local- als auch Remote-Links für jede Größe
+- **Smart Fallback**: Bevorzugt lokale Bilder, fallback auf Remote-URLs
+
+#### Wichtige Hinweise:
+- **JWT-Token-Lebensdauer**: Nur ~10 Minuten gültig - bei Bedarf neu kopieren
+- **Gitignore**: `media/thumbnails/` wird nicht ins Git-Repository eingecheckt
+- **Speicherort**: Thumbnails werden in `media/thumbnails/` gespeichert
+
 # Admin-User erstellen
 python manage.py createsuperuser
+
 ```
 
 ### Admin-Zugang:
