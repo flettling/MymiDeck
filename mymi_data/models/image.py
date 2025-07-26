@@ -23,6 +23,24 @@ class Image(models.Model):
     tags = models.JSONField(default=list)
     deleted_at = models.DateTimeField(null=True, blank=True)
     
+    @property
+    def thumbnail_small_url(self):
+        if self.thumbnail_small:
+            return f"https://mymi.uni-ulm.de/assets/thumbnails/{self.thumbnail_small}"
+        return None
+    
+    @property
+    def thumbnail_medium_url(self):
+        if self.thumbnail_medium:
+            return f"https://mymi.uni-ulm.de/assets/thumbnails/{self.thumbnail_medium}"
+        return None
+    
+    @property
+    def thumbnail_large_url(self):
+        if self.thumbnail_large:
+            return f"https://mymi.uni-ulm.de/assets/thumbnails/{self.thumbnail_large}"
+        return None
+    
     def __str__(self):
         return self.title
     

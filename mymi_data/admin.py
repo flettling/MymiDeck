@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.utils.html import format_html
 from .models import (
     OrganSystem, Species, Staining, Subject, Institution, 
     TileServer, Image, Exploration, Diagnosis, StructureSearch, Locale
@@ -90,9 +91,28 @@ class ImageAdmin(admin.ModelAdmin):
     list_filter = ('state', 'imaging_diagnostic', 'species', 'staining')
     search_fields = ('title', 'file_path')
     readonly_fields = ('id', 'title', 'checksum', 'size', 'file_path', 'thumbnail_small', 
-                      'thumbnail_medium', 'thumbnail_large', 'state', 'imaging_diagnostic', 
+                      'thumbnail_medium', 'thumbnail_large', 'thumbnail_small_link',
+                      'thumbnail_medium_link', 'thumbnail_large_link', 'state', 'imaging_diagnostic', 
                       'staining', 'species', 'tile_server', 'tags', 'deleted_at')
     filter_horizontal = ('organ_systems',)
+    
+    def thumbnail_small_link(self, obj):
+        if obj.thumbnail_small_url:
+            return format_html('<a href="{}" target="_blank">{}</a>', obj.thumbnail_small_url, obj.thumbnail_small_url)
+        return "No thumbnail"
+    thumbnail_small_link.short_description = "Thumbnail Small URL"
+    
+    def thumbnail_medium_link(self, obj):
+        if obj.thumbnail_medium_url:
+            return format_html('<a href="{}" target="_blank">{}</a>', obj.thumbnail_medium_url, obj.thumbnail_medium_url)
+        return "No thumbnail"
+    thumbnail_medium_link.short_description = "Thumbnail Medium URL"
+    
+    def thumbnail_large_link(self, obj):
+        if obj.thumbnail_large_url:
+            return format_html('<a href="{}" target="_blank">{}</a>', obj.thumbnail_large_url, obj.thumbnail_large_url)
+        return "No thumbnail"
+    thumbnail_large_link.short_description = "Thumbnail Large URL"
     
     def get_readonly_fields(self, request, obj=None):
         # Make organ_systems readonly too by overriding the field
