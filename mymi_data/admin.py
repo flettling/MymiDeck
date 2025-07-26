@@ -94,7 +94,7 @@ class ImageAdmin(admin.ModelAdmin):
     search_fields = ('title', 'file_path')
     readonly_fields = ('id', 'title', 'checksum', 'size', 'file_path', 'thumbnail_small', 
                       'thumbnail_medium', 'thumbnail_large', 'thumbnail_small_display',
-                      'thumbnail_medium_display', 'thumbnail_large_display', 'state', 'imaging_diagnostic', 
+                      'thumbnail_medium_display', 'thumbnail_large_display', 'mymi_link_display', 'state', 'imaging_diagnostic', 
                       'staining', 'species', 'tile_server', 'tags', 'deleted_at')
     filter_horizontal = ('organ_systems',)
     
@@ -198,6 +198,11 @@ class ImageAdmin(admin.ModelAdmin):
         return "No large thumbnail"
     thumbnail_large_display.short_description = "Large Thumbnail"
     
+    def mymi_link_display(self, obj):
+        """Display MyMi link as clickable link"""
+        return format_html('<a href="{}" target="_blank">{}</a>', obj.mymi_link, obj.mymi_link)
+    mymi_link_display.short_description = "MyMi Link"
+    
     def get_readonly_fields(self, request, obj=None):
         # Make organ_systems readonly too by overriding the field
         return self.readonly_fields + ('organ_systems',)
@@ -215,7 +220,51 @@ class ExplorationAdmin(admin.ModelAdmin):
     list_filter = ('is_active', 'is_exam', 'institution', 'type')
     search_fields = ('title', 'edu_id')
     readonly_fields = ('id', 'title', 'is_active', 'image', 'institution', 'annotation_group_count', 
-                      'annotation_count', 'is_exam', 'edu_id', 'tags', 'deleted_at', 'type')
+                      'annotation_count', 'is_exam', 'edu_id', 'mymi_link_display', 'image_thumbnail_display', 'tags', 'deleted_at', 'type')
+    
+    def get_local_thumbnail_path(self, filename):
+        """Check if thumbnail exists locally in media/thumbnails/"""
+        if not filename:
+            return None
+        local_path = os.path.join(settings.MEDIA_ROOT, 'thumbnails', filename)
+        if os.path.exists(local_path):
+            return f"{settings.MEDIA_URL}thumbnails/{filename}"
+        return None
+    
+    def mymi_link_display(self, obj):
+        """Display MyMi link as clickable link"""
+        return format_html('<a href="{}" target="_blank">{}</a>', obj.mymi_link, obj.mymi_link)
+    mymi_link_display.short_description = "MyMi Link"
+    
+    def image_thumbnail_display(self, obj):
+        """Display large thumbnail from related Image"""
+        if not obj.image:
+            return "No image"
+        
+        # Use the same logic as ImageAdmin for consistent display
+        local_url = None
+        if obj.image.thumbnail_large:
+            local_url = self.get_local_thumbnail_path(obj.image.thumbnail_large)
+        
+        # Determine which image to show (prefer local)
+        display_url = local_url if local_url else obj.image.thumbnail_large_url
+        
+        if display_url:
+            html = f'<div><img src="{display_url}" style="max-height: 300px; max-width: 400px;" /><br/>'
+            
+            # Add local link if exists
+            if local_url:
+                html += f'<a href="{local_url}" target="_blank">Local: {obj.image.thumbnail_large}</a><br/>'
+            
+            # Add remote link if exists
+            if obj.image.thumbnail_large_url:
+                html += f'<a href="{obj.image.thumbnail_large_url}" target="_blank">Remote: {obj.image.thumbnail_large_url}</a>'
+            
+            html += '</div>'
+            return format_html(html)
+        
+        return "No large thumbnail"
+    image_thumbnail_display.short_description = "Image Thumbnail"
     
     def get_readonly_fields(self, request, obj=None):
         return self.readonly_fields + ('subjects',)

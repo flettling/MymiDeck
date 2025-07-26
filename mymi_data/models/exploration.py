@@ -19,6 +19,10 @@ class Exploration(models.Model):
     deleted_at = models.DateTimeField(null=True, blank=True)
     type = models.CharField(max_length=20, default='exploration')
     
+    @property
+    def mymi_link(self):
+        return f"https://mymi.uni-ulm.de/microscope/exploration/{self.id}"
+    
     def __str__(self):
         return self.title
     

@@ -41,6 +41,10 @@ class Image(models.Model):
             return f"https://mymi.uni-ulm.de/assets/thumbnails/{self.thumbnail_large}"
         return None
     
+    @property
+    def mymi_link(self):
+        return f"https://mymi.uni-ulm.de/api/image/{self.id}/view/render"
+    
     def __str__(self):
         return self.title
     
