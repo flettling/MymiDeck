@@ -1,6 +1,7 @@
 from django.contrib import admin
 from django.utils.html import format_html
 from django.conf import settings
+from django.db.models import Count
 import os
 from .models import (
     OrganSystem, Species, Staining, Subject, Institution, 
@@ -215,14 +216,98 @@ class ImageAdmin(admin.ModelAdmin):
         return False
 
 
+class AnnotationCountConsistencyFilter(admin.SimpleListFilter):
+    title = 'Annotation Count Consistency'
+    parameter_name = 'annotation_count_consistent'
+
+    def lookups(self, request, model_admin):
+        return (
+            ('consistent', 'Count matches (✅)'),
+            ('inconsistent', 'Count mismatch (❌)'),
+            ('not_crawled', 'Not crawled yet (⚠️)'),
+        )
+
+    def queryset(self, request, queryset):
+        if self.value() == 'consistent':
+            # Filter explorations where actual count matches stored count
+            consistent_ids = []
+            for exploration in queryset:
+                actual_count = Annotation.objects.filter(exploration=exploration).count()
+                if actual_count == exploration.annotation_count:
+                    consistent_ids.append(exploration.id)
+            return queryset.filter(id__in=consistent_ids)
+        
+        elif self.value() == 'inconsistent':
+            # Filter explorations where actual count doesn't match stored count
+            inconsistent_ids = []
+            for exploration in queryset:
+                actual_count = Annotation.objects.filter(exploration=exploration).count()
+                if actual_count != exploration.annotation_count and exploration.annotation_count > 0:
+                    inconsistent_ids.append(exploration.id)
+            return queryset.filter(id__in=inconsistent_ids)
+        
+        elif self.value() == 'not_crawled':
+            # Filter explorations that haven't been crawled yet (annotation_count > 0 but no actual annotations)
+            not_crawled_ids = []
+            for exploration in queryset:
+                actual_count = Annotation.objects.filter(exploration=exploration).count()
+                if actual_count == 0 and exploration.annotation_count > 0:
+                    not_crawled_ids.append(exploration.id)
+            return queryset.filter(id__in=not_crawled_ids)
+        
+        return queryset
+
+
+class AnnotationGroupCountConsistencyFilter(admin.SimpleListFilter):
+    title = 'Annotation Group Count Consistency'
+    parameter_name = 'annotation_group_count_consistent'
+
+    def lookups(self, request, model_admin):
+        return (
+            ('consistent', 'Count matches (✅)'),
+            ('inconsistent', 'Count mismatch (❌)'),
+            ('not_crawled', 'Not crawled yet (⚠️)'),
+        )
+
+    def queryset(self, request, queryset):
+        if self.value() == 'consistent':
+            # Filter explorations where actual count matches stored count
+            consistent_ids = []
+            for exploration in queryset:
+                actual_count = AnnotationGroup.objects.filter(exploration=exploration).count()
+                if actual_count == exploration.annotation_group_count:
+                    consistent_ids.append(exploration.id)
+            return queryset.filter(id__in=consistent_ids)
+        
+        elif self.value() == 'inconsistent':
+            # Filter explorations where actual count doesn't match stored count
+            inconsistent_ids = []
+            for exploration in queryset:
+                actual_count = AnnotationGroup.objects.filter(exploration=exploration).count()
+                if actual_count != exploration.annotation_group_count and exploration.annotation_group_count > 0:
+                    inconsistent_ids.append(exploration.id)
+            return queryset.filter(id__in=inconsistent_ids)
+        
+        elif self.value() == 'not_crawled':
+            # Filter explorations that haven't been crawled yet (annotation_group_count > 0 but no actual groups)
+            not_crawled_ids = []
+            for exploration in queryset:
+                actual_count = AnnotationGroup.objects.filter(exploration=exploration).count()
+                if actual_count == 0 and exploration.annotation_group_count > 0:
+                    not_crawled_ids.append(exploration.id)
+            return queryset.filter(id__in=not_crawled_ids)
+        
+        return queryset
+
+
 @admin.register(Exploration)
 class ExplorationAdmin(admin.ModelAdmin):
-    list_display = ('id', 'title', 'is_active', 'image', 'institution', 'is_exam', 'annotations_raw', 'annotation_groups_raw')
-    list_filter = ('is_active', 'is_exam', 'institution', 'type')
+    list_display = ('id', 'title', 'is_active', 'image', 'institution', 'is_exam', 'actual_annotation_count', 'actual_annotation_group_count')
+    list_filter = ('is_active', 'is_exam', 'institution', 'type', AnnotationCountConsistencyFilter, AnnotationGroupCountConsistencyFilter)
     search_fields = ('title', 'edu_id')
     readonly_fields = ('id', 'title', 'is_active', 'image', 'institution', 'annotation_group_count', 
                       'annotation_count', 'is_exam', 'edu_id', 'mymi_link_display', 'image_thumbnail_display', 
-                      'tags', 'deleted_at', 'type')
+                      'tags', 'deleted_at', 'type', 'annotations_by_groups_display')
     
     def get_local_thumbnail_path(self, filename):
         """Check if thumbnail exists locally in media/thumbnails/"""
@@ -268,6 +353,104 @@ class ExplorationAdmin(admin.ModelAdmin):
         return "No large thumbnail"
     image_thumbnail_display.short_description = "Image Thumbnail"
     
+    def annotations_by_groups_display(self, obj):
+        """Display all annotations grouped by annotation groups"""
+        # Get all annotation groups for this exploration
+        annotation_groups = AnnotationGroup.objects.filter(exploration=obj).order_by('taglabel', 'tagname')
+        
+        if not annotation_groups.exists():
+            return "No annotation groups found"
+        
+        html_parts = []
+        total_annotations = 0
+        
+        for group in annotation_groups:
+            # Find annotations that belong to this group
+            related_annotations = Annotation.objects.filter(
+                exploration=obj,
+                tag_ids__contains=[group.tagid]
+            ).order_by('annotationname', 'id')
+            
+            # Group header
+            group_name = group.taglabel or group.tagname or f"Group {group.id}"
+            group_admin_url = f"/admin/mymi_data/annotationgroup/{group.id}/change/"
+            html_parts.append(f'<h4><a href="{group_admin_url}" target="_blank">{group_name}</a></h4>')
+            
+            if related_annotations.exists():
+                # List annotations in this group
+                html_parts.append('<ul>')
+                for annotation in related_annotations:
+                    admin_url = f"/admin/mymi_data/annotation/{annotation.id}/change/"
+                    name = annotation.annotationname or f"Annotation {annotation.id}"
+                    html_parts.append(f'<li><a href="{admin_url}" target="_blank">{name}</a> (Type: {annotation.type})</li>')
+                    total_annotations += 1
+                html_parts.append('</ul>')
+            else:
+                html_parts.append('<p><em>No annotations in this group</em></p>')
+        
+        # Check for annotations without groups (tag_ids empty or not matching any group)
+        all_group_tagids = list(annotation_groups.values_list('tagid', flat=True))
+        ungrouped_annotations = Annotation.objects.filter(exploration=obj).exclude(
+            tag_ids__overlap=all_group_tagids
+        ).order_by('annotationname', 'id')
+        
+        if ungrouped_annotations.exists():
+            html_parts.append('<h4>📌 Ungrouped Annotations</h4>')
+            html_parts.append('<ul>')
+            for annotation in ungrouped_annotations:
+                admin_url = f"/admin/mymi_data/annotation/{annotation.id}/change/"
+                name = annotation.annotationname or f"Annotation {annotation.id}"
+                html_parts.append(f'<li><a href="{admin_url}" target="_blank">{name}</a> (Type: {annotation.type})</li>')
+                total_annotations += 1
+            html_parts.append('</ul>')
+        
+        # Summary
+        html_parts.append(f'<hr><small><strong>Total: {total_annotations} annotation(s) in {annotation_groups.count()} group(s)</strong></small>')
+        
+        return format_html(''.join(html_parts))
+    annotations_by_groups_display.short_description = "Annotations by Groups"
+    
+    def actual_annotation_count(self, obj):
+        """Display actual count of annotations vs stored count"""
+        actual_count = Annotation.objects.filter(exploration=obj).count()
+        stored_count = obj.annotation_count
+        
+        if actual_count == stored_count:
+            status = "✅"
+            color = "green"
+        elif actual_count == 0 and stored_count > 0:
+            status = "⚠️"
+            color = "orange"
+        else:
+            status = "❌"
+            color = "red"
+        
+        return format_html(
+            '<span style="color: {};">{} {} / {}</span>',
+            color, status, actual_count, stored_count
+        )
+    actual_annotation_count.short_description = "Annotations (Actual/Expected)"
+    
+    def actual_annotation_group_count(self, obj):
+        """Display actual count of annotation groups vs stored count"""
+        actual_count = AnnotationGroup.objects.filter(exploration=obj).count()
+        stored_count = obj.annotation_group_count
+        
+        if actual_count == stored_count:
+            status = "✅"
+            color = "green"
+        elif actual_count == 0 and stored_count > 0:
+            status = "⚠️"
+            color = "orange"
+        else:
+            status = "❌"
+            color = "red"
+        
+        return format_html(
+            '<span style="color: {};">{} {} / {}</span>',
+            color, status, actual_count, stored_count
+        )
+    actual_annotation_group_count.short_description = "Groups (Actual/Expected)"
     
     def get_readonly_fields(self, request, obj=None):
         return self.readonly_fields + ('subjects',)
@@ -360,7 +543,32 @@ class AnnotationGroupAdmin(admin.ModelAdmin):
     list_filter = ('exploration', 'creator_id')
     search_fields = ('taglabel', 'tagname', 'tagdescription')
     readonly_fields = ('id', 'tagid', 'tagname', 'revision', 'taggroup', 'taglabel', 
-                      'tagdescription', 'creator_id', 'displaystyle', 'exploration')
+                      'tagdescription', 'creator_id', 'displaystyle', 'exploration', 'related_annotations_display')
+    
+    def related_annotations_display(self, obj):
+        """Display all annotations that belong to this annotation group"""
+        # Find annotations in the same exploration that have this tagid in their tag_ids
+        related_annotations = Annotation.objects.filter(
+            exploration=obj.exploration,
+            tag_ids__contains=[obj.tagid]
+        ).order_by('id')
+        
+        if not related_annotations.exists():
+            return "No related annotations"
+        
+        # Create HTML list of related annotations
+        html_items = []
+        for annotation in related_annotations:
+            # Create a link to the annotation in admin
+            admin_url = f"/admin/mymi_data/annotation/{annotation.id}/change/"
+            name = annotation.annotationname or f"Annotation {annotation.id}"
+            html_items.append(f'<li><a href="{admin_url}" target="_blank">{name}</a> (Type: {annotation.type})</li>')
+        
+        html = f'<ul>{"".join(html_items)}</ul>'
+        html += f'<small>Total: {related_annotations.count()} annotation(s)</small>'
+        
+        return format_html(html)
+    related_annotations_display.short_description = "Related Annotations"
     
     def has_add_permission(self, request):
         return False
