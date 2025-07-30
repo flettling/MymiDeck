@@ -4,7 +4,8 @@ from django.conf import settings
 import os
 from .models import (
     OrganSystem, Species, Staining, Subject, Institution, 
-    TileServer, Image, Exploration, Diagnosis, StructureSearch, Locale
+    TileServer, Image, Exploration, Annotation, AnnotationGroup, 
+    Diagnosis, StructureSearch, Locale
 )
 
 
@@ -216,11 +217,12 @@ class ImageAdmin(admin.ModelAdmin):
 
 @admin.register(Exploration)
 class ExplorationAdmin(admin.ModelAdmin):
-    list_display = ('id', 'title', 'is_active', 'image', 'institution', 'is_exam')
+    list_display = ('id', 'title', 'is_active', 'image', 'institution', 'is_exam', 'annotations_raw', 'annotation_groups_raw')
     list_filter = ('is_active', 'is_exam', 'institution', 'type')
     search_fields = ('title', 'edu_id')
     readonly_fields = ('id', 'title', 'is_active', 'image', 'institution', 'annotation_group_count', 
-                      'annotation_count', 'is_exam', 'edu_id', 'mymi_link_display', 'image_thumbnail_display', 'tags', 'deleted_at', 'type')
+                      'annotation_count', 'is_exam', 'edu_id', 'mymi_link_display', 'image_thumbnail_display', 
+                      'tags', 'deleted_at', 'type')
     
     def get_local_thumbnail_path(self, filename):
         """Check if thumbnail exists locally in media/thumbnails/"""
@@ -265,6 +267,7 @@ class ExplorationAdmin(admin.ModelAdmin):
         
         return "No large thumbnail"
     image_thumbnail_display.short_description = "Image Thumbnail"
+    
     
     def get_readonly_fields(self, request, obj=None):
         return self.readonly_fields + ('subjects',)
@@ -343,6 +346,40 @@ class StructureSearchAdmin(admin.ModelAdmin):
     
     def get_readonly_fields(self, request, obj=None):
         return self.readonly_fields + ('subjects',)
+    
+    def has_add_permission(self, request):
+        return False
+    
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(AnnotationGroup)
+class AnnotationGroupAdmin(admin.ModelAdmin):
+    list_display = ('id', 'taglabel', 'tagname', 'exploration', 'creator_id')
+    list_filter = ('exploration', 'creator_id')
+    search_fields = ('taglabel', 'tagname', 'tagdescription')
+    readonly_fields = ('id', 'tagid', 'tagname', 'revision', 'taggroup', 'taglabel', 
+                      'tagdescription', 'creator_id', 'displaystyle', 'exploration')
+    
+    def has_add_permission(self, request):
+        return False
+    
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(Annotation)
+class AnnotationAdmin(admin.ModelAdmin):
+    list_display = ('id', 'annotationname', 'type', 'exploration', 'show', 'creator_id')
+    list_filter = ('type', 'show', 'exploration', 'creator_id')
+    search_fields = ('annotationname', 'annotationdescription')
+    readonly_fields = ('id', 'annotationid', 'annotationname', 'annotationdescription', 
+                      'show', 'version', 'revision', 'type', 'coord_xmin', 'coord_xmax',
+                      'coord_ymin', 'coord_ymax', 'coord_zmin', 'coord_zmax', 'coord_tmin',
+                      'coord_tmax', 'geometry', 'rotation', 'displaystyle', 'tag_ids',
+                      'channels', 'scope_id', 'creator_id', 'mousebinded', 'tagdescription',
+                      'typespecificflags', 'exploration')
     
     def has_add_permission(self, request):
         return False

@@ -19,6 +19,10 @@ class Exploration(models.Model):
     deleted_at = models.DateTimeField(null=True, blank=True)
     type = models.CharField(max_length=20, default='exploration')
     
+    # Raw API responses for annotations
+    annotations_raw = models.JSONField(null=True, blank=True, help_text="Raw API response from /annotation/annotation endpoint")
+    annotation_groups_raw = models.JSONField(null=True, blank=True, help_text="Raw API response from /annotation/annotation-group endpoint")
+    
     @property
     def mymi_link(self):
         return f"https://mymi.uni-ulm.de/microscope/exploration/{self.id}"
