@@ -1,0 +1,216 @@
+{% extends "admin/change_form.html" %}
+{% load static %}
+
+{% block admin_change_form_document_ready %}
+{{ block.super }}
+<script type="text/javascript">
+(function($) {
+    'use strict';
+    
+    $(document).ready(function() {
+        // Find the solution_image field
+        var $fileInput = $('#id_solution_image');
+        var $fileField = $fileInput.closest('.field-solution_image');
+        
+        if ($fileInput.length && $fileField.length) {
+            // Create paste area
+            var $pasteArea = $('<div id="paste-area" style="' +
+                'border: 2px dashed #ccc; ' +
+                'border-radius: 8px; ' +
+                'padding: 20px; ' +
+                'margin: 10px 0; ' +
+                'text-align: center; ' +
+                'background-color: #f9f9f9; ' +
+                'cursor: pointer; ' +
+                'transition: all 0.3s ease;' +
+                '">' +
+                '<p style="margin: 0; color: #666; font-size: 14px;">' +
+                '📋 <strong>Bild aus Zwischenablage einfügen</strong><br>' +
+                '<small>Klicken Sie hier und drücken Sie Strg+V (Cmd+V auf Mac) um ein Bild einzufügen</small>' +
+                '</p>' +
+                '</div>');
+            
+            // Add paste area after the file input
+            $fileField.append($pasteArea);
+            
+            // Status message area
+            var $statusMsg = $('<div id="paste-status" style="margin: 10px 0; font-size: 13px;"></div>');
+            $pasteArea.after($statusMsg);
+            
+            // Make paste area focusable
+            $pasteArea.attr('tabindex', '0');
+            
+            // Hover effects
+            $pasteArea.hover(
+                function() {
+                    $(this).css({
+                        'border-color': '#007cba',
+                        'background-color': '#f0f8ff'
+                    });
+                },
+                function() {
+                    $(this).css({
+                        'border-color': '#ccc',
+                        'background-color': '#f9f9f9'
+                    });
+                }
+            );
+            
+            // Focus effects
+            $pasteArea.focus(function() {
+                $(this).css({
+                    'border-color': '#007cba',
+                    'background-color': '#f0f8ff',
+                    'box-shadow': '0 0 5px rgba(0,124,186,0.3)'
+                });
+            }).blur(function() {
+                $(this).css({
+                    'border-color': '#ccc',
+                    'background-color': '#f9f9f9',
+                    'box-shadow': 'none'
+                });
+            });
+            
+            // Click to focus
+            $pasteArea.click(function() {
+                $(this).focus();
+            });
+            
+            // Paste functionality
+            function handlePaste(e) {
+                var clipboardData = e.originalEvent.clipboardData || window.clipboardData;
+                
+                if (!clipboardData) {
+                    showStatus('❌ Zwischenablage nicht verfügbar', 'error');
+                    return;
+                }
+                
+                var items = clipboardData.items;
+                var imageFile = null;
+                
+                // Look for image in clipboard
+                for (var i = 0; i < items.length; i++) {
+                    if (items[i].type.indexOf('image') !== -1) {
+                        imageFile = items[i].getAsFile();
+                        break;
+                    }
+                }
+                
+                if (!imageFile) {
+                    showStatus('❌ Kein Bild in der Zwischenablage gefunden', 'error');
+                    return;
+                }
+                
+                // Create File object for the input
+                var dt = new DataTransfer();
+                
+                // Generate filename with timestamp
+                var timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+                var extension = imageFile.type.split('/')[1] || 'png';
+                var filename = 'pasted-image-' + timestamp + '.' + extension;
+                
+                // Create new file with proper name
+                var renamedFile = new File([imageFile], filename, {
+                    type: imageFile.type,
+                    lastModified: Date.now()
+                });
+                
+                dt.items.add(renamedFile);
+                $fileInput[0].files = dt.files;
+                
+                // Trigger change event
+                $fileInput.trigger('change');
+                
+                showStatus('✅ Bild erfolgreich eingefügt: ' + filename, 'success');
+                
+                // Update UI
+                $pasteArea.css({
+                    'border-color': '#46b450',
+                    'background-color': '#f0fff0'
+                });
+                
+                setTimeout(function() {
+                    $pasteArea.css({
+                        'border-color': '#ccc',
+                        'background-color': '#f9f9f9'
+                    });
+                }, 2000);
+                
+                e.preventDefault();
+            }
+            
+            // Status message function
+            function showStatus(message, type) {
+                var color = type === 'error' ? '#dc3232' : '#46b450';
+                $statusMsg.html('<span style="color: ' + color + ';">' + message + '</span>');
+                
+                setTimeout(function() {
+                    $statusMsg.empty();
+                }, 5000);
+            }
+            
+            // Bind paste event to paste area and document
+            $pasteArea.on('paste', handlePaste);
+            $(document).on('paste', function(e) {
+                if ($pasteArea.is(':focus') || $(e.target).closest('#paste-area').length) {
+                    handlePaste(e);
+                }
+            });
+            
+            // Keyboard instructions
+            $pasteArea.on('keydown', function(e) {
+                if ((e.ctrlKey || e.metaKey) && e.keyCode === 86) { // Ctrl/Cmd + V
+                    // Paste will be handled by paste event
+                    showStatus('⏳ Warte auf Bild aus Zwischenablage...', 'info');
+                }
+            });
+            
+            // File input change handler to show selected file
+            $fileInput.on('change', function() {
+                var files = this.files;
+                if (files && files.length > 0) {
+                    var file = files[0];
+                    showStatus('📁 Datei ausgewählt: ' + file.name + ' (' + formatFileSize(file.size) + ')', 'success');
+                }
+            });
+            
+            // Helper function to format file size
+            function formatFileSize(bytes) {
+                if (bytes === 0) return '0 Bytes';
+                var k = 1024;
+                var sizes = ['Bytes', 'KB', 'MB', 'GB'];
+                var i = Math.floor(Math.log(bytes) / Math.log(k));
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+            }
+        }
+    });
+})(django.jQuery);
+</script>
+
+<style type="text/css">
+#paste-area {
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+}
+
+#paste-area:focus {
+    outline: none;
+}
+
+.field-solution_image {
+    position: relative;
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.02); }
+    100% { transform: scale(1); }
+}
+
+#paste-area.pasting {
+    animation: pulse 0.3s ease-in-out;
+}
+</style>
+{% endblock %}

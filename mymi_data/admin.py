@@ -474,14 +474,34 @@ class DiagnosisAdmin(admin.ModelAdmin):
     def has_delete_permission(self, request, obj=None):
         return False
 
+class SolutionImageFilter(admin.SimpleListFilter):
+    title = 'Solution Image'
+    parameter_name = 'has_solution_image'
+
+    def lookups(self, request, model_admin):
+        return (
+            ('yes', 'Has solution image'),
+            ('no', 'No solution image'),
+        )
+
+    def queryset(self, request, queryset):
+        if self.value() == 'yes':
+            return queryset.filter(solution_image__isnull=False).exclude(solution_image='')
+        elif self.value() == 'no':
+            return queryset.filter(solution_image__isnull=True) | queryset.filter(solution_image='')
+        return queryset
+
 
 @admin.register(StructureSearch)
 class StructureSearchAdmin(admin.ModelAdmin):
-    list_display = ('id', 'title', 'is_active', 'image', 'institution', 'is_exam')
-    list_filter = ('is_active', 'is_exam', 'institution')
+    list_display = ('id', 'title', 'is_active', 'image', 'institution', 'is_exam', 'has_solution_image')
+    list_filter = (SolutionImageFilter, 'is_active', 'is_exam', 'institution')
     search_fields = ('title',)
     readonly_fields = ('id', 'title', 'is_active', 'image', 'institution', 'is_exam', 
-                      'annotation_group_count', 'annotation_count', 'mymi_link_display', 'image_thumbnail_display', 'tags', 'deleted_at', 'type')
+                      'annotation_group_count', 'annotation_count', 'mymi_link_display', 'image_thumbnail_display', 'tags', 'deleted_at', 'type', 'solution_image_display')
+    fields = ('id', 'title', 'is_active', 'image', 'institution', 'is_exam', 
+              'annotation_group_count', 'annotation_count', 'solution_image', 'solution_image_display',
+              'mymi_link_display', 'image_thumbnail_display', 'tags', 'deleted_at', 'type', 'subjects')
     
     def get_local_thumbnail_path(self, filename):
         """Check if thumbnail exists locally in media/thumbnails/"""
@@ -527,6 +547,27 @@ class StructureSearchAdmin(admin.ModelAdmin):
         return "No large thumbnail"
     image_thumbnail_display.short_description = "Image Thumbnail"
     
+    def has_solution_image(self, obj):
+        """Display if structure search has a solution image"""
+        return bool(obj.solution_image)
+    has_solution_image.short_description = "Solution Image"
+    has_solution_image.boolean = True
+    
+    def solution_image_display(self, obj):
+        """Display solution image if available"""
+        if not obj.solution_image:
+            return "No solution image uploaded"
+        
+        return format_html(
+            '<div>'
+            '<img src="{}" style="max-height: 300px; max-width: 400px;" /><br/>'
+            '<a href="{}" target="_blank">View full size</a>'
+            '</div>',
+            obj.solution_image.url,
+            obj.solution_image.url
+        )
+    solution_image_display.short_description = "Solution Image Preview"
+    
     def get_readonly_fields(self, request, obj=None):
         return self.readonly_fields + ('subjects',)
     
@@ -535,6 +576,9 @@ class StructureSearchAdmin(admin.ModelAdmin):
     
     def has_delete_permission(self, request, obj=None):
         return False
+    
+    def has_change_permission(self, request, obj=None):
+        return True
 
 
 @admin.register(AnnotationGroup)

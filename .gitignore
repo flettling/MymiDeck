@@ -49,4 +49,4 @@ db.sqlite3-journal
 .idea/
 
 # Downloaded thumbnails
-media/thumbnails/
+media
