@@ -2,8 +2,11 @@ from django.db import models
 
 
 class AnnotationGroup(models.Model):
-    # MyMi ID fields
-    id = models.IntegerField(primary_key=True)
+    # Django auto-generated primary key
+    # id = models.AutoField(primary_key=True)  # This is implicit
+    
+    # MyMi ID fields (from API)
+    external_id = models.IntegerField(null=True, blank=True, help_text="Original ID from MyMi API")
     tagid = models.IntegerField()
     
     # Basic information
@@ -23,9 +26,9 @@ class AnnotationGroup(models.Model):
     exploration = models.ForeignKey('Exploration', on_delete=models.CASCADE, related_name='annotation_groups')
     
     def __str__(self):
-        return f"{self.taglabel or self.tagname} (ID: {self.id})"
+        return f"{self.taglabel or self.tagname} (External ID: {self.external_id})"
     
     class Meta:
         verbose_name = "Annotation Group"
         verbose_name_plural = "Annotation Groups"
-        unique_together = ['id', 'exploration']
+        # unique_together = ['external_id', 'exploration']  # Will be re-added after data migration

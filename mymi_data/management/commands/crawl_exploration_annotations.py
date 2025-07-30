@@ -150,18 +150,34 @@ class Command(BaseCommand):
 
         for group_data in groups_data:
             try:
-                AnnotationGroup.objects.create(
-                    id=group_data.get('id'),
-                    tagid=group_data.get('tagid', group_data.get('id')),
-                    tagname=group_data.get('tagname', ''),
-                    revision=group_data.get('revision', ''),
-                    taggroup=group_data.get('taggroup', ''),
-                    taglabel=group_data.get('taglabel', ''),
-                    tagdescription=group_data.get('tagdescription', ''),
-                    creator_id=group_data.get('creator_id', 0),
-                    displaystyle=group_data.get('displaystyle'),
-                    exploration=exploration
+                # Helper function to safely convert to int
+                def safe_int(value, default=0):
+                    if value == '' or value is None:
+                        return default
+                    try:
+                        return int(value)
+                    except (ValueError, TypeError):
+                        return default
+
+                # Use get_or_create to handle shared annotation groups across explorations
+                group, created = AnnotationGroup.objects.get_or_create(
+                    external_id=safe_int(group_data.get('id')),
+                    exploration=exploration,
+                    defaults={
+                        'tagid': safe_int(group_data.get('tagid', group_data.get('id'))),
+                        'tagname': group_data.get('tagname', ''),
+                        'revision': group_data.get('revision', ''),
+                        'taggroup': group_data.get('taggroup', ''),
+                        'taglabel': group_data.get('taglabel', ''),
+                        'tagdescription': group_data.get('tagdescription', ''),
+                        'creator_id': safe_int(group_data.get('creator_id'), 0),
+                        'displaystyle': group_data.get('displaystyle'),
+                    }
                 )
+                if created:
+                    self.stdout.write(f'    ➕ Created new annotation group {group.external_id}')
+                else:
+                    self.stdout.write(f'    ♻️  Reused existing annotation group {group.external_id}')
             except Exception as e:
                 self.stdout.write(f'    ⚠️ Failed to save annotation group {group_data.get("id")}: {str(e)}')
 
@@ -175,30 +191,57 @@ class Command(BaseCommand):
 
         for annotation_data in annotations_data:
             try:
+                # Helper function to safely convert to int
+                def safe_int(value, default=0):
+                    if value == '' or value is None:
+                        return default
+                    try:
+                        return int(value)
+                    except (ValueError, TypeError):
+                        return default
+
+                # Helper function to safely convert to int or None
+                def safe_int_or_none(value):
+                    if value == '' or value is None:
+                        return None
+                    try:
+                        return int(value)
+                    except (ValueError, TypeError):
+                        return None
+
+                # Helper function to safely convert to float
+                def safe_float(value, default=0.0):
+                    if value == '' or value is None:
+                        return default
+                    try:
+                        return float(value)
+                    except (ValueError, TypeError):
+                        return default
+
                 Annotation.objects.create(
-                    id=annotation_data.get('id'),
+                    external_id=safe_int_or_none(annotation_data.get('id')),
                     annotationid=annotation_data.get('annotationid', annotation_data.get('id')),
                     annotationname=annotation_data.get('annotationname', ''),
                     annotationdescription=annotation_data.get('annotationdescription', ''),
                     show=annotation_data.get('show', True),
-                    version=annotation_data.get('version', 1),
+                    version=safe_int(annotation_data.get('version'), 1),
                     revision=annotation_data.get('revision', ''),
-                    type=annotation_data.get('type', 0),
-                    coord_xmin=annotation_data.get('xmin', 0),
-                    coord_xmax=annotation_data.get('xmax', 0),
-                    coord_ymin=annotation_data.get('ymin', 0),
-                    coord_ymax=annotation_data.get('ymax', 0),
-                    coord_zmin=annotation_data.get('zmin', 0),
-                    coord_zmax=annotation_data.get('zmax', 0),
-                    coord_tmin=annotation_data.get('tmin', 0),
-                    coord_tmax=annotation_data.get('tmax', 0),
+                    type=safe_int(annotation_data.get('type'), 0),
+                    coord_xmin=safe_int(annotation_data.get('xmin'), 0),
+                    coord_xmax=safe_int(annotation_data.get('xmax'), 0),
+                    coord_ymin=safe_int(annotation_data.get('ymin'), 0),
+                    coord_ymax=safe_int(annotation_data.get('ymax'), 0),
+                    coord_zmin=safe_int(annotation_data.get('zmin'), 0),
+                    coord_zmax=safe_int(annotation_data.get('zmax'), 0),
+                    coord_tmin=safe_int(annotation_data.get('tmin'), 0),
+                    coord_tmax=safe_int(annotation_data.get('tmax'), 0),
                     geometry=annotation_data.get('geometry', []),
-                    rotation=annotation_data.get('rotation', 0),
+                    rotation=safe_float(annotation_data.get('rotation'), 0),
                     displaystyle=annotation_data.get('displaystyle'),
                     tag_ids=annotation_data.get('tag_ids', []),
                     channels=annotation_data.get('channels', []),
-                    scope_id=annotation_data.get('scope_id', 0),
-                    creator_id=annotation_data.get('creator_id', 0),
+                    scope_id=safe_int_or_none(annotation_data.get('scope_id')),
+                    creator_id=safe_int(annotation_data.get('creator_id'), 0),
                     mousebinded=annotation_data.get('mousebinded', False),
                     tagdescription=annotation_data.get('tagdescription', ''),
                     typespecificflags=annotation_data.get('typespecificflags', ''),

@@ -2,8 +2,11 @@ from django.db import models
 
 
 class Annotation(models.Model):
-    # MyMi ID fields
-    id = models.IntegerField(primary_key=True)
+    # Django auto-generated primary key
+    # id = models.AutoField(primary_key=True)  # This is implicit
+    
+    # MyMi ID fields (from API)
+    external_id = models.IntegerField(null=True, blank=True, help_text="Original ID from MyMi API")
     annotationid = models.IntegerField()
     
     # Basic information
@@ -44,7 +47,7 @@ class Annotation(models.Model):
     channels = models.JSONField(default=list)
     
     # Additional fields
-    scope_id = models.IntegerField(default=0)
+    scope_id = models.IntegerField(null=True, blank=True)
     creator_id = models.IntegerField(default=0)
     mousebinded = models.BooleanField(default=False)
     tagdescription = models.TextField(blank=True)
@@ -54,7 +57,7 @@ class Annotation(models.Model):
     exploration = models.ForeignKey('Exploration', on_delete=models.CASCADE, related_name='annotations')
     
     def __str__(self):
-        return f"{self.annotationname} (ID: {self.id})"
+        return f"{self.annotationname} (External ID: {self.external_id})"
     
     @property
     def associated_groups(self):
@@ -70,4 +73,4 @@ class Annotation(models.Model):
     class Meta:
         verbose_name = "Annotation"
         verbose_name_plural = "Annotations"
-        unique_together = ['id', 'exploration']
+        # unique_together = ['external_id', 'exploration']  # Will be re-added after data migration

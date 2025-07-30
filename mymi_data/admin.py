@@ -539,11 +539,12 @@ class StructureSearchAdmin(admin.ModelAdmin):
 
 @admin.register(AnnotationGroup)
 class AnnotationGroupAdmin(admin.ModelAdmin):
-    list_display = ('id', 'taglabel', 'tagname', 'exploration', 'creator_id')
+    list_display = ('id', 'external_id', 'taglabel', 'tagname', 'exploration', 'creator_id')
     list_filter = ('exploration', 'creator_id')
     search_fields = ('taglabel', 'tagname', 'tagdescription')
-    readonly_fields = ('id', 'tagid', 'tagname', 'revision', 'taggroup', 'taglabel', 
+    readonly_fields = ('id', 'external_id', 'tagid', 'tagname', 'revision', 'taggroup', 'taglabel', 
                       'tagdescription', 'creator_id', 'displaystyle', 'exploration', 'related_annotations_display')
+    actions = ['delete_selected_annotation_groups']
     
     def related_annotations_display(self, obj):
         """Display all annotations that belong to this annotation group"""
@@ -570,30 +571,45 @@ class AnnotationGroupAdmin(admin.ModelAdmin):
         return format_html(html)
     related_annotations_display.short_description = "Related Annotations"
     
+    def delete_selected_annotation_groups(self, request, queryset):
+        """Custom delete action for annotation groups"""
+        count = queryset.count()
+        queryset.delete()
+        self.message_user(request, f'Successfully deleted {count} annotation group(s).')
+    delete_selected_annotation_groups.short_description = "Delete selected annotation groups"
+    
     def has_add_permission(self, request):
         return False
     
     def has_delete_permission(self, request, obj=None):
-        return False
+        return True
 
 
 @admin.register(Annotation)
 class AnnotationAdmin(admin.ModelAdmin):
-    list_display = ('id', 'annotationname', 'type', 'exploration', 'show', 'creator_id')
-    list_filter = ('type', 'show', 'exploration', 'creator_id')
+    list_display = ('id', 'external_id', 'annotationname', 'type', 'exploration', 'show', 'creator_id')
+    list_filter = ('type', 'show', 'exploration', 'creator_id', 'exploration__institution')
     search_fields = ('annotationname', 'annotationdescription')
-    readonly_fields = ('id', 'annotationid', 'annotationname', 'annotationdescription', 
+    readonly_fields = ('id', 'external_id', 'annotationid', 'annotationname', 'annotationdescription', 
                       'show', 'version', 'revision', 'type', 'coord_xmin', 'coord_xmax',
                       'coord_ymin', 'coord_ymax', 'coord_zmin', 'coord_zmax', 'coord_tmin',
                       'coord_tmax', 'geometry', 'rotation', 'displaystyle', 'tag_ids',
                       'channels', 'scope_id', 'creator_id', 'mousebinded', 'tagdescription',
                       'typespecificflags', 'exploration')
+    actions = ['delete_selected_annotations']
+    
+    def delete_selected_annotations(self, request, queryset):
+        """Custom delete action for annotations"""
+        count = queryset.count()
+        queryset.delete()
+        self.message_user(request, f'Successfully deleted {count} annotation(s).')
+    delete_selected_annotations.short_description = "Delete selected annotations"
     
     def has_add_permission(self, request):
         return False
     
     def has_delete_permission(self, request, obj=None):
-        return False
+        return True
 
 
 @admin.register(Locale)
